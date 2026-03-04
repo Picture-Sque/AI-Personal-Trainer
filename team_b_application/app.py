@@ -45,13 +45,11 @@ def main():
                 break
                 
             try:
-                # --- INPUT PARSING (Handles "80" OR "80, 50") ---
+                # --- INPUT PARSING ---
                 if "," in user_input:
-                    # Split "80, 50" into [80.0, 50.0]
                     parts = user_input.split(",")
                     input_data = [float(parts[0]), float(parts[1])]
                 else:
-                    # Normal single number
                     input_data = float(user_input)
 
                 # --- PROCESS THE REP ---
@@ -62,13 +60,13 @@ def main():
                     print(f"🔊 COACH: '{feedback_text}'")
                     speak(feedback_text)
                 
-                # --- CHECK FOR GAME OVER (RED LIGHT) ---
+                # --- CHECK FOR GAME OVER ---
                 if trainer.game_over:
                     print("\n🛑 SESSION TERMINATED: FATIGUE DETECTED")
                     print(f"Final Score: {trainer.reps} Reps")
                     print("Returning to menu in 4 seconds...")
                     time.sleep(4) 
-                    break # Break inner loop -> Main Menu
+                    break # Breaks inner loop -> Back to Main Menu
                     
             except ValueError:
                 print("Invalid input. Please enter a number.")
