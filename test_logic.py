@@ -47,9 +47,9 @@ def main():
     success &= test_exercise("Push Up", PushUp, 80, 170)
     
     # High Knees (Down -> Knees Up -> Down)
-    # stage: DOWN -> UP (hip < 70) -> DOWN (hip > 140)
+    # stage: DOWN -> UP (ratio < 0.2) -> DOWN (ratio > 0.6)
     # Every 2 half-reps = 1 full rep.
-    success &= test_exercise("High Knees", HighKnees, 60, 160, half_rep_multiplier=2)
+    success &= test_exercise("High Knees", HighKnees, 10, 70, half_rep_multiplier=2)
     
     # Lateral Raise (Down -> Up -> Down)
     # stage: DOWN -> UP (shoulder > 80) -> DOWN (shoulder < 30)
