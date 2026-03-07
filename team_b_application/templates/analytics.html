@@ -37,7 +37,7 @@
     </div>
 </div>
 
-{% if data.weekly %}
+{% if stats.total_workouts > 0 %}
 <!-- CHARTS ROW 1 -->
 <div class="charts-grid animate-in">
     <div class="chart-card">
@@ -72,7 +72,7 @@
 </div>
 {% endif %}
 
-{% if not data.weekly and not data.personal_records %}
+{% if stats.total_workouts == 0 %}
 <div class="empty-state animate-in">
     <div class="empty-icon">📊</div>
     <h3>No data yet</h3>
