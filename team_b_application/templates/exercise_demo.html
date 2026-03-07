@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% set active_page = 'exercises' %}
+
+{% block title %}{{ exercise.name }} Demo{% endblock %}
+
+{% block content %}
+<div class="demo-container">
+    <!-- BACK LINK -->
+    <a href="{{ url_for('exercises') }}" style="display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 14px; margin-bottom: 20px; transition: color 0.2s;">
+        ← Back to Exercises
+    </a>
+
+    <!-- HERO -->
+    <div class="demo-hero animate-in">
+        <img src="{{ url_for('static', filename='images/' + exercise.image) }}" alt="{{ exercise.name }}" class="demo-hero-image">
+        <div class="demo-hero-body">
+            <h1>{{ exercise.name }}</h1>
+            <p class="demo-desc">{{ exercise.description }}</p>
+            
+            <div class="demo-meta-row">
+                <div class="demo-meta-pill">
+                    <span class="pill-icon">💪</span>
+                    {{ exercise.muscle_group }}
+                </div>
+                <div class="demo-meta-pill">
+                    <span class="pill-icon">📷</span>
+                    {{ exercise.camera_view }} View
+                </div>
+                <div class="demo-meta-pill">
+                    <span class="pill-icon">📊</span>
+                    {{ exercise.difficulty }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEMO VIDEO BUTTON -->
+    {% if exercise.demo_video %}
+    <div class="demo-video-section animate-in animate-in-delay-1">
+        <h3>🎬 Watch Proper Form</h3>
+        <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 16px;">
+            See a professional demonstration of this exercise to ensure your form is correct.
+        </p>
+        <div class="demo-video-btn-wrapper">
+            <a href="https://www.youtube.com/watch?v={{ exercise.demo_video }}" target="_blank" rel="noopener noreferrer" class="demo-video-btn">
+                <span class="yt-icon">▶</span>
+                <span>Watch Demo on YouTube</span>
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- INSTRUCTIONS -->
+    <div class="demo-sections">
+        <div class="demo-section animate-in animate-in-delay-2">
+            <h3>✅ How to Perform</h3>
+            <ul>
+                {% for step in exercise.instructions %}
+                <li>{{ step }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="demo-section avoid animate-in animate-in-delay-2">
+            <h3>⚠️ What to Avoid</h3>
+            <ul>
+                {% for mistake in exercise.avoid %}
+                <li>{{ mistake }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- TRACKING INFO -->
+    <div class="tracking-info animate-in animate-in-delay-3">
+        <h3>🎯 What We Track</h3>
+        <p>{{ exercise.tracking_info }}</p>
+        <p class="target">{{ exercise.target_angle }}</p>
+    </div>
+
+    <!-- CAMERA HINT -->
+    <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; text-align: center;" class="animate-in animate-in-delay-3">
+        <p style="font-size: 15px; color: var(--text-secondary);">
+            📷 <strong>Camera Position:</strong> Place your camera/webcam so it shows your 
+            <strong style="color: var(--accent-cyan);">{{ exercise.camera_view|lower }}</strong> view. 
+            {% if exercise.camera_view == 'Side' %}
+            Stand with your <strong>left side</strong> facing the camera.
+            {% else %}
+            Face the camera directly.
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- START BUTTON -->
+    <a href="{{ url_for('start_exercise', exercise_id=exercise.id) }}" class="demo-start-btn animate-in animate-in-delay-4">
+        🚀 Start {{ exercise.name }} Workout
+    </a>
+    <p class="camera-hint">Press <strong>Q</strong> during the session to end early. Results are saved automatically.</p>
+</div>
+{% endblock %}

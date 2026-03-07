@@ -4,7 +4,7 @@ import numpy as np
 
 # IMPORT THE MODULES
 from vision_engine import VisionEngine  # The Eyes
-from logic import Squat, BicepCurl ,JumpingJacks     # The Brain
+from logic import Squat, BicepCurl, JumpingJacks, ShoulderPress, Lunge, PushUp, HighKnees, LateralRaise  # The Brain
 from feedback import speak              # The Voice 🔊
 
 def main():
@@ -18,6 +18,11 @@ def main():
         print("1. Squat (Tracks Knee & Back)")
         print("2. Bicep Curl (Tracks Elbow)")
         print("3. Jumping Jacks (Tracks Arm Raises)")
+        print("4. Shoulder Press (Tracks Arm Extension)")
+        print("5. Lunge (Tracks Knee Depth)")
+        print("6. Push-Up (Tracks Elbow & Body Line)")
+        print("7. High Knees (Tracks Knee Height)")
+        print("8. Lateral Raise (Tracks Arm Raise)")
         print("q. Exit Application")
         
         choice = input("\nSelect Option: ")
@@ -31,6 +36,16 @@ def main():
             trainer = BicepCurl()
         elif choice == '3':
             trainer = JumpingJacks()
+        elif choice == '4':
+            trainer = ShoulderPress()
+        elif choice == '5':
+            trainer = Lunge()
+        elif choice == '6':
+            trainer = PushUp()
+        elif choice == '7':
+            trainer = HighKnees()
+        elif choice == '8':
+            trainer = LateralRaise()
         else:
             print("Invalid selection. Try again.")
             continue

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% set active_page = 'dashboard' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- HEADER -->
+<div class="page-header animate-in">
+    <h1 class="greeting">Welcome back, <span>Athlete</span> 💪</h1>
+    <p class="subtext">{{ now.strftime('%A, %B %d, %Y') if now else 'Ready to crush your workout today?' }}</p>
+</div>
+
+<!-- STATS -->
+<div class="stats-grid">
+    <div class="stat-card animate-in animate-in-delay-1">
+        <div class="stat-icon">🏋️</div>
+        <div class="stat-value">{{ stats.total_workouts }}</div>
+        <div class="stat-label">Total Workouts</div>
+    </div>
+    <div class="stat-card animate-in animate-in-delay-2">
+        <div class="stat-icon">📅</div>
+        <div class="stat-value">{{ stats.this_week }}</div>
+        <div class="stat-label">This Week</div>
+    </div>
+    <div class="stat-card animate-in animate-in-delay-3">
+        <div class="stat-icon">🔥</div>
+        <div class="stat-value">{{ stats.calories_burned }}</div>
+        <div class="stat-label">Calories Burned</div>
+    </div>
+    <div class="stat-card animate-in animate-in-delay-4">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-value">{{ stats.streak }}</div>
+        <div class="stat-label">Day Streak</div>
+    </div>
+</div>
+
+<!-- QUICK START -->
+<div class="section-header">
+    <h2>Quick Start</h2>
+    <a href="{{ url_for('exercises') }}" class="view-all">View All →</a>
+</div>
+<div class="exercise-grid">
+    {% for key, ex in exercises.items() %}
+    <a href="{{ url_for('exercise_demo', exercise_id=key) }}" class="exercise-card animate-in" style="animation-delay: {{ loop.index * 0.05 }}s">
+        <div class="card-image-wrapper">
+            <img src="{{ url_for('static', filename='images/' + ex.image) }}" alt="{{ ex.name }}" class="card-image">
+        </div>
+        <div class="card-body">
+            <div class="card-title">{{ ex.name }}</div>
+            <div class="card-meta">
+                <span>💪 {{ ex.muscle_group }}</span>
+                <span>📷 {{ ex.camera_view }}</span>
+            </div>
+            <span class="card-badge badge-{{ ex.difficulty|lower }}">{{ ex.difficulty }}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- RECENT WORKOUTS -->
+<div class="section-header">
+    <h2>Recent Workouts</h2>
+    <a href="{{ url_for('history') }}" class="view-all">View All →</a>
+</div>
+{% if recent %}
+<div class="data-table-wrapper animate-in">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Exercise</th>
+                <th>Reps</th>
+                <th>Duration</th>
+                <th>Fatigue</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for w in recent %}
+            <tr>
+                <td>{{ w.created_at[:16] if w.created_at else 'N/A' }}</td>
+                <td>{{ w.exercise }}</td>
+                <td>{{ w.reps }}</td>
+                <td>{{ "%.1f"|format(w.duration_seconds) }}s</td>
+                <td><span class="fatigue-badge fatigue-{{ w.fatigue_level }}">
+                    {{ 'Normal' if w.fatigue_level == 0 else ('Warning' if w.fatigue_level == 1 else 'Severe') }}
+                </span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state animate-in">
+    <div class="empty-icon">🏃</div>
+    <h3>No workouts yet</h3>
+    <p>Start your first exercise to see your history here!</p>
+</div>
+{% endif %}
+
+<!-- ACHIEVEMENTS -->
+{% if achievements %}
+<div class="section-header" style="margin-top: 40px;">
+    <h2>Achievements 🏆</h2>
+</div>
+<div class="achievements-grid">
+    {% for ach in achievements %}
+    <div class="achievement-card animate-in">
+        <div class="ach-icon">{{ ach.icon }}</div>
+        <div>
+            <div class="ach-name">{{ ach.name }}</div>
+            <div class="ach-desc">{{ ach.description }}</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

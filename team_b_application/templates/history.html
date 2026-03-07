@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% set active_page = 'history' %}
+
+{% block title %}Workout History{% endblock %}
+
+{% block content %}
+<div class="page-header animate-in">
+    <h1 class="page-title">Workout History</h1>
+    <p class="page-subtitle">Your complete training log</p>
+</div>
+
+<!-- FILTER BAR -->
+<div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;" class="animate-in">
+    <select id="filterExercise" onchange="filterTable()" style="padding: 10px 16px; background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: 13px; cursor: pointer;">
+        <option value="">All Exercises</option>
+        <option value="Squat">Squat</option>
+        <option value="Bicep Curl">Bicep Curl</option>
+        <option value="Jumping Jacks">Jumping Jacks</option>
+        <option value="Shoulder Press">Shoulder Press</option>
+        <option value="Lunge">Lunge</option>
+        <option value="Push Up">Push-Up</option>
+        <option value="High Knees">High Knees</option>
+        <option value="Lateral Raise">Lateral Raise</option>
+    </select>
+</div>
+
+{% if workouts %}
+<div class="data-table-wrapper animate-in animate-in-delay-1">
+    <table class="data-table" id="historyTable">
+        <thead>
+            <tr>
+                <th>Date & Time</th>
+                <th>Exercise</th>
+                <th>Reps</th>
+                <th>Duration</th>
+                <th>Avg Speed</th>
+                <th>Fatigue</th>
+                <th>Warnings</th>
+                <th>Calories</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for w in workouts %}
+            <tr data-exercise="{{ w.exercise }}">
+                <td>{{ w.created_at[:16] if w.created_at else 'N/A' }}</td>
+                <td style="font-weight: 600;">{{ w.exercise }}</td>
+                <td>{{ w.reps }}</td>
+                <td>{{ "%.1f"|format(w.duration_seconds) }}s</td>
+                <td>{{ "%.1f"|format(w.avg_rep_speed) if w.avg_rep_speed else 'N/A' }}s/rep</td>
+                <td>
+                    <span class="fatigue-badge fatigue-{{ w.fatigue_level }}">
+                        {{ 'Normal' if w.fatigue_level == 0 else ('Warning' if w.fatigue_level == 1 else 'Severe') }}
+                    </span>
+                </td>
+                <td>{{ w.form_warnings }}</td>
+                <td>{{ "%.1f"|format(w.calories_burned) if w.calories_burned else '0' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top: 20px; text-align: right;">
+    <button onclick="exportCSV()" class="back-btn" style="font-size: 13px; padding: 10px 20px;">
+        📥 Export to CSV
+    </button>
+</div>
+{% else %}
+<div class="empty-state animate-in">
+    <div class="empty-icon">📋</div>
+    <h3>No workout history yet</h3>
+    <p>Complete your first workout to start tracking your progress!</p>
+    <a href="{{ url_for('exercises') }}" class="back-btn" style="margin-top: 16px; display: inline-block;">
+        Browse Exercises →
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterTable() {
+    const filter = document.getElementById('filterExercise').value;
+    const rows = document.querySelectorAll('#historyTable tbody tr');
+    rows.forEach(row => {
+        if (!filter || row.dataset.exercise === filter) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function exportCSV() {
+    const table = document.getElementById('historyTable');
+    if (!table) return;
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(row => {
+        const cols = row.querySelectorAll('td, th');
+        const rowData = [];
+        cols.forEach(col => rowData.push('"' + col.textContent.trim().replace(/"/g, '""') + '"'));
+        csv.push(rowData.join(','));
+    });
+    
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'workout_history.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
+{% endblock %}

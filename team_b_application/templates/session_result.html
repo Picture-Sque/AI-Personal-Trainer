@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% set active_page = 'exercises' %}
+
+{% block title %}Session Started{% endblock %}
+
+{% block content %}
+<div class="session-result">
+    <div class="result-icon">🎯</div>
+    <h1>{{ exercise.name }} Session Launched!</h1>
+    <p>Your camera window should open shortly. Get into position!</p>
+
+    <div class="result-note">
+        <p><strong>📷 Camera Position:</strong> {{ exercise.camera_view }} view — 
+        {% if exercise.camera_view == 'Side' %}stand with your left side facing the camera.
+        {% else %}face the camera directly.{% endif %}</p>
+        <br>
+        <p><strong>🎮 Controls:</strong></p>
+        <p>• Press <strong>Q</strong> to end the session early</p>
+        <p>• Your results will be saved automatically when the session ends</p>
+        <br>
+        <p><strong>🎯 Target:</strong> {{ exercise.target_angle }}</p>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}" class="back-btn">
+        ← Back to Dashboard
+    </a>
+    
+    <a href="{{ url_for('history') }}" class="back-btn" style="margin-left: 12px;">
+        📋 View History
+    </a>
+</div>
+
+<!-- Auto-refresh hint -->
+<script>
+    // Subtle pulse animation on the icon
+    const icon = document.querySelector('.result-icon');
+    if (icon) {
+        icon.style.animation = 'pulse 2s infinite';
+    }
+</script>
+{% endblock %}

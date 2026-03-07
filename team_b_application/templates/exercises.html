@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% set active_page = 'exercises' %}
+
+{% block title %}Exercises{% endblock %}
+
+{% block content %}
+<div class="page-header animate-in">
+    <h1 class="page-title">Exercises</h1>
+    <p class="page-subtitle">Choose an exercise to view the demo and start your workout</p>
+</div>
+
+<div class="exercise-grid">
+    {% for key, ex in exercises.items() %}
+    <a href="{{ url_for('exercise_demo', exercise_id=key) }}" class="exercise-card animate-in" style="animation-delay: {{ loop.index * 0.06 }}s">
+        <div class="card-image-wrapper">
+            <img src="{{ url_for('static', filename='images/' + ex.image) }}" alt="{{ ex.name }}" class="card-image" loading="lazy">
+        </div>
+        <div class="card-body">
+            <div class="card-title">{{ ex.name }}</div>
+            <div class="card-meta">
+                <span>💪 {{ ex.muscle_group }}</span>
+                <span>📷 {{ ex.camera_view }} View</span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+                {{ ex.description[:80] }}...
+            </p>
+            <span class="card-badge badge-{{ ex.difficulty|lower }}">{{ ex.difficulty }}</span>
+            <div class="start-btn">View Demo & Start →</div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}

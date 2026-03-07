@@ -1,5 +1,5 @@
 import time
-from logic import Squat, BicepCurl
+from logic import Squat, BicepCurl, JumpingJacks, ShoulderPress, Lunge, PushUp, HighKnees, LateralRaise
 from feedback import speak
 
 def main():
@@ -9,6 +9,12 @@ def main():
         print("=========================================")
         print("1. Start Squat Session")
         print("2. Start Bicep Curl Session")
+        print("3. Start Jumping Jacks Session")
+        print("4. Start Shoulder Press Session")
+        print("5. Start Lunge Session")
+        print("6. Start Push-Up Session")
+        print("7. Start High Knees Session")
+        print("8. Start Lateral Raise Session")
         print("q. Exit Application")
         
         choice = input("\nSelect Option: ")
@@ -28,6 +34,30 @@ def main():
             trainer = BicepCurl()
             print("\n--- BICEP CURL SESSION STARTED ---")
             print("Tip: Type 170 (Down) -> 25 (Curl Up)")
+        elif choice == '3':
+            trainer = JumpingJacks()
+            print("\n--- JUMPING JACKS SESSION STARTED ---")
+            print("Tip: Type 150 (Arms Up) -> 40 (Arms Down)")
+        elif choice == '4':
+            trainer = ShoulderPress()
+            print("\n--- SHOULDER PRESS SESSION STARTED ---")
+            print("Tip: Type 170 (Arms Up) -> 70 (Arms Down)")
+        elif choice == '5':
+            trainer = Lunge()
+            print("\n--- LUNGE SESSION STARTED ---")
+            print("Tip: Type 170 (Standing) -> 80 (Lunge Down)")
+        elif choice == '6':
+            trainer = PushUp()
+            print("\n--- PUSH-UP SESSION STARTED ---")
+            print("Tip: Type 170 (Arms Straight) -> 70 (Arms Bent)")
+        elif choice == '7':
+            trainer = HighKnees()
+            print("\n--- HIGH KNEES SESSION STARTED ---")
+            print("Tip: Type 60 (Knee Up) -> 160 (Knee Down)")
+        elif choice == '8':
+            trainer = LateralRaise()
+            print("\n--- LATERAL RAISE SESSION STARTED ---")
+            print("Tip: Type 90 (Arms Up) -> 20 (Arms Down)")
         else:
             print("Invalid selection.")
             continue 
