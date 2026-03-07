@@ -204,7 +204,7 @@ EXERCISES = {
         ],
         'tracking_info': 'We track both hip angles, leg alternation, and torso lean. Every 2 knee raises = 1 rep.',
         'target_angle': 'Hip angle: <70° when knee is raised',
-        'demo_video': 'D0VjPEz7Z_4'
+        'demo_video': '0X0Q8wKLEfo'
     },
     'lateral_raise': {
         'id': 'lateral_raise',
