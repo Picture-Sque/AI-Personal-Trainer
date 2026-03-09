@@ -5,11 +5,40 @@ Premium dark-themed dashboard with workout history, analytics, and exercise mana
 import subprocess
 import sys
 import json
+import time as _time
 import threading
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+import cv2
+from flask import Flask, render_template, request, redirect, url_for, jsonify, Response
+from logic import (Squat, BicepCurl, JumpingJacks, ShoulderPress,
+                   Lunge, PushUp, HighKnees, LateralRaise)
+from vision_engine import VisionEngine
+from feedback import speak
 import database as db
 
 app = Flask(__name__)
+
+# ==========================================
+# LIVE SESSION STATE (shared between threads)
+# ==========================================
+session_lock = threading.Lock()
+active_session = {
+    'running': False,
+    'stop_requested': False,
+    'exercise_name': '',
+    'reps': 0,
+    'stage': '',
+    'angle': 0,
+    'feedback': '',
+    'game_over': False,
+    'output_frame': None,  # The latest JPEG-encoded frame
+    'form_warnings': 0,
+}
+
+CLASS_MAP = {
+    'Squat': Squat, 'BicepCurl': BicepCurl, 'JumpingJacks': JumpingJacks,
+    'ShoulderPress': ShoulderPress, 'Lunge': Lunge, 'PushUp': PushUp,
+    'HighKnees': HighKnees, 'LateralRaise': LateralRaise
+}
 
 # ==========================================
 # EXERCISE DATA (metadata for UI)
@@ -267,27 +296,20 @@ def exercise_demo(exercise_id):
 
 @app.route('/start/<exercise_id>')
 def start_exercise(exercise_id):
-    """Launch the OpenCV camera session in a background thread."""
+    """Start a live in-browser camera session."""
     exercise = EXERCISES.get(exercise_id)
     if not exercise:
         return redirect(url_for('exercises'))
 
-    # Launch the camera session via main.py subprocess
+    # Stop any existing session first
+    _stop_active_session()
+    _time.sleep(0.3)
+
+    # Launch the camera processing loop in a background thread
     def run_session():
-        import time as _time
-        from logic import (Squat, BicepCurl, JumpingJacks, ShoulderPress,
-                           Lunge, PushUp, HighKnees, LateralRaise)
-        from vision_engine import VisionEngine
-        from feedback import speak
-        import cv2
+        global active_session
 
-        class_map = {
-            'Squat': Squat, 'BicepCurl': BicepCurl, 'JumpingJacks': JumpingJacks,
-            'ShoulderPress': ShoulderPress, 'Lunge': Lunge, 'PushUp': PushUp,
-            'HighKnees': HighKnees, 'LateralRaise': LateralRaise
-        }
-
-        trainer_class = class_map.get(exercise['class_name'])
+        trainer_class = CLASS_MAP.get(exercise['class_name'])
         if not trainer_class:
             return
 
@@ -297,10 +319,31 @@ def start_exercise(exercise_id):
         speak(f"Starting {trainer.name} session")
 
         cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            with session_lock:
+                active_session['running'] = False
+            return
+
         session_start = _time.time()
         form_warnings = 0
 
+        with session_lock:
+            active_session['running'] = True
+            active_session['stop_requested'] = False
+            active_session['exercise_name'] = trainer.name
+            active_session['reps'] = 0
+            active_session['stage'] = trainer.stage
+            active_session['angle'] = 0
+            active_session['feedback'] = ''
+            active_session['game_over'] = False
+            active_session['form_warnings'] = 0
+
         while cap.isOpened():
+            # Check if stop was requested
+            with session_lock:
+                if active_session['stop_requested']:
+                    break
+
             ret, frame = cap.read()
             if not ret:
                 break
@@ -311,7 +354,7 @@ def start_exercise(exercise_id):
             if landmarks:
                 rep_complete, feedback_text, angle = trainer.process(landmarks)
 
-                # UI Drawing
+                # --- HUD OVERLAY (drawn on the streamed frame) ---
                 cv2.rectangle(image, (0, 0), (350, 120), (245, 117, 16), -1)
                 cv2.putText(image, trainer.name.upper(), (15, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 1, cv2.LINE_AA)
@@ -337,19 +380,34 @@ def start_exercise(exercise_id):
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 2, cv2.LINE_AA)
                     speak(feedback_text)
 
+                # Update shared session state
+                with session_lock:
+                    active_session['reps'] = trainer.reps
+                    active_session['stage'] = trainer.stage
+                    active_session['angle'] = int(angle)
+                    active_session['form_warnings'] = form_warnings
+                    if feedback_text:
+                        active_session['feedback'] = feedback_text
+
                 if trainer.game_over:
                     cv2.putText(image, "SESSION OVER", (130, 250),
                                 cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 5, cv2.LINE_AA)
-                    cv2.imshow('AI Trainer', image)
-                    cv2.waitKey(4000)
-                    break
+                    with session_lock:
+                        active_session['game_over'] = True
 
-            cv2.imshow('AI Trainer', image)
-            if cv2.waitKey(10) & 0xFF == ord('q'):
+            # Encode the frame as JPEG and store in shared state
+            ret_enc, buffer = cv2.imencode('.jpg', image)
+            if ret_enc:
+                with session_lock:
+                    active_session['output_frame'] = buffer.tobytes()
+
+            # If game over, show the final frame briefly then break
+            if trainer.game_over:
+                _time.sleep(3)
                 break
 
+        # Cleanup
         cap.release()
-        cv2.destroyAllWindows()
 
         # Save workout to database
         duration = _time.time() - session_start
@@ -365,11 +423,64 @@ def start_exercise(exercise_id):
                 form_warnings=form_warnings
             )
 
-    # Run in a thread so Flask stays responsive
+        with session_lock:
+            active_session['running'] = False
+
     t = threading.Thread(target=run_session, daemon=True)
     t.start()
 
-    return render_template('session_result.html', exercise=exercise)
+    return render_template('session_live.html', exercise=exercise)
+
+
+def _stop_active_session():
+    """Signal the active session to stop."""
+    with session_lock:
+        if active_session['running']:
+            active_session['stop_requested'] = True
+
+
+@app.route('/video_feed')
+def video_feed():
+    """Stream MJPEG frames to the browser."""
+    def generate():
+        while True:
+            with session_lock:
+                frame = active_session.get('output_frame')
+                running = active_session.get('running', False)
+            if frame is not None:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            else:
+                _time.sleep(0.05)
+            if not running and frame is not None:
+                # Send the last frame one more time then stop
+                break
+            _time.sleep(0.03)  # ~30 FPS cap
+
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@app.route('/stop_session', methods=['POST'])
+def stop_session():
+    """Stop the active workout session."""
+    _stop_active_session()
+    return jsonify({'status': 'stopped'})
+
+
+@app.route('/api/session_status')
+def api_session_status():
+    """Return live session stats for AJAX polling."""
+    with session_lock:
+        return jsonify({
+            'running': active_session['running'],
+            'reps': active_session['reps'],
+            'stage': active_session['stage'],
+            'angle': active_session['angle'],
+            'feedback': active_session['feedback'],
+            'game_over': active_session['game_over'],
+            'form_warnings': active_session['form_warnings'],
+            'exercise_name': active_session['exercise_name'],
+        })
 
 
 @app.route('/history')

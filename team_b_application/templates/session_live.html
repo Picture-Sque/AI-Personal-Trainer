@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% set active_page = 'exercises' %}
+
+{% block title %}{{ exercise.name }} — Live Session{% endblock %}
+
+{% block content %}
+<div class="live-session-container animate-in">
+
+    <!-- TOP BAR -->
+    <div class="live-header">
+        <div class="live-header-left">
+            <span class="live-dot"></span>
+            <h2>{{ exercise.name }}</h2>
+            <span class="live-badge">LIVE</span>
+        </div>
+        <button id="stopBtn" class="stop-btn" onclick="stopSession()">
+            ⏹ End Session
+        </button>
+    </div>
+
+    <!-- MAIN LAYOUT: VIDEO + STATS -->
+    <div class="live-body">
+        <!-- VIDEO FEED -->
+        <div class="live-video-wrapper">
+            <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Live Camera Feed" class="live-video">
+            <div id="gameOverOverlay" class="game-over-overlay" style="display: none;">
+                <div class="game-over-text">SESSION COMPLETE</div>
+                <p>Fatigue detected — workout saved automatically</p>
+            </div>
+        </div>
+
+        <!-- STATS PANEL -->
+        <div class="live-stats-panel">
+            <div class="live-stat-card accent-purple">
+                <div class="live-stat-label">REPS</div>
+                <div class="live-stat-value" id="liveReps">0</div>
+            </div>
+            <div class="live-stat-card accent-cyan">
+                <div class="live-stat-label">STAGE</div>
+                <div class="live-stat-value small" id="liveStage">—</div>
+            </div>
+            <div class="live-stat-card accent-green">
+                <div class="live-stat-label">ANGLE</div>
+                <div class="live-stat-value" id="liveAngle">0°</div>
+            </div>
+            <div class="live-stat-card accent-amber">
+                <div class="live-stat-label">WARNINGS</div>
+                <div class="live-stat-value" id="liveWarnings">0</div>
+            </div>
+
+            <!-- COACHING FEEDBACK -->
+            <div class="live-feedback-card" id="feedbackCard">
+                <div class="feedback-label">🎙️ COACH</div>
+                <div class="feedback-text" id="liveFeedback">Get into position...</div>
+            </div>
+
+            <!-- EXERCISE INFO -->
+            <div class="live-info-card">
+                <p><strong>📷 Camera:</strong> {{ exercise.camera_view }} view</p>
+                <p><strong>🎯 Target:</strong> {{ exercise.target_angle }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let polling = null;
+    let sessionEnded = false;
+
+    function pollStatus() {
+        if (sessionEnded) return;
+
+        fetch('/api/session_status')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('liveReps').textContent = data.reps;
+                document.getElementById('liveStage').textContent = data.stage || '—';
+                document.getElementById('liveAngle').textContent = data.angle + '°';
+                document.getElementById('liveWarnings').textContent = data.form_warnings;
+
+                if (data.feedback) {
+                    const el = document.getElementById('liveFeedback');
+                    el.textContent = data.feedback;
+                    // Flash the feedback card
+                    const card = document.getElementById('feedbackCard');
+                    card.classList.add('feedback-flash');
+                    setTimeout(() => card.classList.remove('feedback-flash'), 600);
+                }
+
+                if (data.game_over) {
+                    document.getElementById('gameOverOverlay').style.display = 'flex';
+                    sessionEnded = true;
+                    setTimeout(() => {
+                        window.location.href = '/history';
+                    }, 4000);
+                    return;
+                }
+
+                if (!data.running && data.reps > 0) {
+                    // Session ended (user stopped or completed)
+                    sessionEnded = true;
+                    window.location.href = '/history';
+                    return;
+                }
+            })
+            .catch(err => console.log('Poll error:', err));
+    }
+
+    function stopSession() {
+        if (sessionEnded) return;
+        sessionEnded = true;
+
+        const btn = document.getElementById('stopBtn');
+        btn.textContent = '⏳ Stopping...';
+        btn.disabled = true;
+
+        fetch('/stop_session', { method: 'POST' })
+            .then(() => {
+                setTimeout(() => {
+                    window.location.href = '/history';
+                }, 1500);
+            })
+            .catch(() => {
+                window.location.href = '/history';
+            });
+    }
+
+    // Start polling every 500ms
+    polling = setInterval(pollStatus, 500);
+    // Initial poll
+    setTimeout(pollStatus, 1000);
+</script>
+{% endblock %}
