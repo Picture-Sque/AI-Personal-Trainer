@@ -301,9 +301,8 @@ def start_exercise(exercise_id):
     if not exercise:
         return redirect(url_for('exercises'))
 
-    # Stop any existing session first
+    # Stop any existing session first and wait for it to fully die
     _stop_active_session()
-    _time.sleep(0.3)
 
     # Launch the camera processing loop in a background thread
     def run_session():
@@ -337,6 +336,7 @@ def start_exercise(exercise_id):
             active_session['feedback'] = ''
             active_session['game_over'] = False
             active_session['form_warnings'] = 0
+            active_session['output_frame'] = None  # Clear stale frame from previous session
 
         while cap.isOpened():
             # Check if stop was requested
@@ -402,8 +402,13 @@ def start_exercise(exercise_id):
                     active_session['output_frame'] = buffer.tobytes()
 
             # If game over, show the final frame briefly then break
+            # Use interruptible sleep so _stop_active_session can kill it fast
             if trainer.game_over:
-                _time.sleep(3)
+                for _ in range(30):  # ~3 seconds in 0.1s increments
+                    with session_lock:
+                        if active_session['stop_requested']:
+                            break
+                    _time.sleep(0.1)
                 break
 
         # Cleanup
@@ -433,10 +438,17 @@ def start_exercise(exercise_id):
 
 
 def _stop_active_session():
-    """Signal the active session to stop."""
+    """Signal the active session to stop and wait for it to finish."""
     with session_lock:
         if active_session['running']:
             active_session['stop_requested'] = True
+
+    # Wait up to 5 seconds for the old session thread to fully stop
+    for _ in range(50):
+        with session_lock:
+            if not active_session['running']:
+                break
+        _time.sleep(0.1)
 
 
 @app.route('/video_feed')
