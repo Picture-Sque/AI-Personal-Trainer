@@ -656,16 +656,22 @@ class Lunge(Exercise):
 #   Camera View: SIDE facing
 #   Primary Angle: Elbow angle (shoulder → elbow → wrist)
 #   Rep Logic: Arms straight (UP) → Arms bent near floor (DOWN)
+#   Form Gate: Reps ONLY count if body form is valid (straight legs + aligned body)
+#
+# FORM VALIDATION:
+#   - Knee angle (hip → knee → ankle) must be >150° (straight legs)
+#   - Body angle (shoulder → hip → ankle) must be >145° (proper plank)
+#   - If either fails, the rep does NOT count and user is warned
 #
 # CHEAT DETECTION:
-#   1. HIP SAGGING - Shoulder-hip-ankle angle <150°
-#      → Hips drop toward the floor; core not engaged, lower back stress.
-#   2. HIP PIKING - Shoulder-hip-ankle angle >200° (hips too high)
-#      → Butt goes up in the air to make the push-up easier.
-#   3. HALF REPS - Elbow doesn't bend past 110°
+#   1. BENT KNEES - Knee angle <150° (hip → knee → ankle)
+#      → User bends knees to make push-up easier. Rep NOT counted.
+#   2. HIP SAGGING - Shoulder-hip-ankle angle <150°
+#      → Hips drop toward the floor; core not engaged. Rep NOT counted.
+#   3. HIP PIKING - Shoulder-hip-ankle angle >200° (hips too high)
+#      → Butt goes up in the air to make the push-up easier. Rep NOT counted.
+#   4. HALF REPS - Elbow doesn't bend past 110°
 #      → User barely lowers themselves, skipping the hardest part.
-#   4. FLARED ELBOWS - Tracked via shoulder-to-elbow lateral distance
-#      → Bad for shoulder joints, reduces chest activation.
 # ==========================================
 class PushUp(Exercise):
     def __init__(self):
@@ -686,11 +692,24 @@ class PushUp(Exercise):
             "You're piking up. Keep your body flat like a plank.",
             "Don't stick your butt up. Maintain a straight body line."
         ]
+        # CHEAT: Bent knees (not a proper push-up)
+        self.phrases_bent_knees = [
+            "Straighten your legs! Don't bend your knees.",
+            "Keep your legs straight. Bent knees make it too easy.",
+            "Extend your legs fully. No knee push-ups!",
+            "Lock your knees out. Your legs must be straight."
+        ]
         # CHEAT: Not going low enough
         self.phrases_half_rep = [
             "Go lower! Your chest should nearly touch the ground.",
             "That's a half rep. Bend your elbows to at least 90 degrees.",
             "Full range of motion. Lower yourself all the way down."
+        ]
+        # CHEAT: Bad body line (general)
+        self.phrases_bad_form = [
+            "Fix your form first! Keep a straight plank position.",
+            "Your body line is off. Straighten up before continuing.",
+            "That rep doesn't count. Get into a proper plank first."
         ]
         self.phrases_push = [
             "You're slowing down. Push through it!",
@@ -701,45 +720,65 @@ class PushUp(Exercise):
 
         # Track partial reps to warn about them
         self.lowest_elbow_angle = 180  # Track how low they actually go each rep
+        # Track whether form was valid during the rep
+        self.form_valid_during_rep = True
 
     def process(self, landmarks):
         feedback = None
         rep_complete = False
         current_time = time.time()
+        knee_angle = 175  # Default for terminal mode
 
         if isinstance(landmarks, (int, float)):
             elbow_angle = landmarks
             body_angle = 175
+            knee_angle = 175
         else:
             # --- EXTRACT JOINTS (Side view) ---
             shoulder = landmarks['LEFT_SHOULDER']
             elbow = landmarks['LEFT_ELBOW']
             wrist = landmarks['LEFT_WRIST']
             hip = landmarks['LEFT_HIP']
+            knee = landmarks['LEFT_KNEE']
             ankle = landmarks['LEFT_ANKLE']
 
             # --- PRIMARY ANGLE ---
             elbow_angle = calculate_angle(shoulder, elbow, wrist)
 
-            # --- CHEAT DETECTION ANGLE ---
+            # --- FORM VALIDATION ANGLES ---
             # Body line: shoulder → hip → ankle (should be ~180 = straight plank)
             body_angle = calculate_angle(shoulder, hip, ankle)
+            # Knee angle: hip → knee → ankle (should be ~180 = straight legs)
+            knee_angle = calculate_angle(hip, knee, ankle)
 
         # Track the lowest point of the rep
         if elbow_angle < self.lowest_elbow_angle:
             self.lowest_elbow_angle = elbow_angle
 
+        # --- FORM VALIDATION ---
+        # Both body and knees must be straight for a valid push-up
+        knees_straight = knee_angle > 150
+        body_aligned = body_angle > 145
+
         # --- CHEAT DETECTION ---
 
-        # 1. HIP SAGGING (injury risk - lower back strain)
-        if body_angle < 150:
+        # 1. BENT KNEES (not a real push-up — highest priority)
+        if not knees_straight:
+            self.form_valid_during_rep = False
+            if (current_time - self.last_speech_time) > self.speech_cooldown:
+                feedback = random.choice(self.phrases_bent_knees)
+                self.last_speech_time = current_time
+
+        # 2. HIP SAGGING (injury risk - lower back strain)
+        elif body_angle < 150:
+            self.form_valid_during_rep = False
             if (current_time - self.last_speech_time) > self.speech_cooldown:
                 feedback = random.choice(self.phrases_sag)
                 self.last_speech_time = current_time
 
-        # 2. HIP PIKING (making the exercise easier)
-        # Note: calculate_angle caps at 180, so we only use hip.y < shoulder.y check
+        # 3. HIP PIKING (making the exercise easier)
         elif not isinstance(landmarks, (int, float)) and body_angle > 165 and landmarks['LEFT_HIP'][1] < landmarks['LEFT_SHOULDER'][1]:
+            self.form_valid_during_rep = False
             if (current_time - self.last_speech_time) > self.speech_cooldown:
                 feedback = random.choice(self.phrases_pike)
                 self.last_speech_time = current_time
@@ -758,25 +797,36 @@ class PushUp(Exercise):
                 self.stage = "UP"
                 duration = self.stop_rep_timer()
                 fatigue_level = self.get_fatigue_level(duration)
-                self.reps += 1
 
-                # 3. HALF REP CHECK (after rep completes)
-                if self.lowest_elbow_angle > 110:
+                # *** FORM GATE: Only count rep if form was valid ***
+                if not self.form_valid_during_rep:
+                    # Bad form — don't count the rep
+                    if (current_time - self.last_speech_time) > self.speech_cooldown:
+                        feedback = random.choice(self.phrases_bad_form)
+                        self.last_speech_time = current_time
+                elif self.lowest_elbow_angle > 110:
+                    # Half rep — count it but warn
+                    self.reps += 1
                     if (current_time - self.last_speech_time) > self.speech_cooldown:
                         feedback = f"{self.reps}. {random.choice(self.phrases_half_rep)}"
                         self.last_speech_time = current_time
+                    rep_complete = True
                 elif fatigue_level == 2:
+                    self.reps += 1
                     feedback = self.phrases_stop
                     self.game_over = True
+                    rep_complete = True
                 else:
+                    self.reps += 1
                     if fatigue_level == 1:
                         feedback = f"{self.reps}. {random.choice(self.phrases_push)}"
                     else:
                         feedback = str(self.reps)
+                    rep_complete = True
 
                 # Reset tracking for next rep
                 self.lowest_elbow_angle = 180
-                rep_complete = True
+                self.form_valid_during_rep = True
 
         return rep_complete, feedback, elbow_angle
 
