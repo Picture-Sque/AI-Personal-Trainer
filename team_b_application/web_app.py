@@ -304,12 +304,29 @@ def start_exercise(exercise_id):
     # Stop any existing session first and wait for it to fully die
     _stop_active_session()
 
+    # Pre-initialize session state BEFORE spawning the thread.
+    # This ensures the page and /video_feed see fresh state immediately,
+    # preventing stale frames from the previous session from being served.
+    with session_lock:
+        active_session['running'] = True
+        active_session['stop_requested'] = False
+        active_session['exercise_name'] = exercise['name']
+        active_session['reps'] = 0
+        active_session['stage'] = ''
+        active_session['angle'] = 0
+        active_session['feedback'] = ''
+        active_session['game_over'] = False
+        active_session['form_warnings'] = 0
+        active_session['output_frame'] = None  # Clear stale frame
+
     # Launch the camera processing loop in a background thread
     def run_session():
         global active_session
 
         trainer_class = CLASS_MAP.get(exercise['class_name'])
         if not trainer_class:
+            with session_lock:
+                active_session['running'] = False
             return
 
         trainer = trainer_class()
@@ -326,17 +343,9 @@ def start_exercise(exercise_id):
         session_start = _time.time()
         form_warnings = 0
 
+        # Update stage now that trainer is initialized
         with session_lock:
-            active_session['running'] = True
-            active_session['stop_requested'] = False
-            active_session['exercise_name'] = trainer.name
-            active_session['reps'] = 0
             active_session['stage'] = trainer.stage
-            active_session['angle'] = 0
-            active_session['feedback'] = ''
-            active_session['game_over'] = False
-            active_session['form_warnings'] = 0
-            active_session['output_frame'] = None  # Clear stale frame from previous session
 
         while cap.isOpened():
             # Check if stop was requested
@@ -459,14 +468,20 @@ def video_feed():
             with session_lock:
                 frame = active_session.get('output_frame')
                 running = active_session.get('running', False)
+                game_over = active_session.get('game_over', False)
+
             if frame is not None:
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
             else:
+                # No frame yet — camera is still starting up, wait
                 _time.sleep(0.05)
-            if not running and frame is not None:
-                # Send the last frame one more time then stop
+                continue
+
+            # Only stop streaming after session has fully ended
+            if not running:
                 break
+
             _time.sleep(0.03)  # ~30 FPS cap
 
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
